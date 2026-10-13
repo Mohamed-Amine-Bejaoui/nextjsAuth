@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TP2 - Gestion des rôles
 
-## Getting Started
+Application Next.js de gestion des étudiants avec authentification JWT,
+Prisma/SQLite et contrôle d'accès serveur.
 
-First, run the development server:
+## Démarrage
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ouvrir http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Routes d'authentification :
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
 
-## Learn More
+Routes étudiants :
 
-To learn more about Next.js, take a look at the following resources:
+- `GET /api/students` : tous les étudiants pour `ADMIN` et `ENSEIGNANT`,
+  uniquement son profil pour `ETUDIANT`
+- `POST /api/students` : réservé à `ADMIN`
+- `PATCH /api/students/:id` : `ADMIN`, ou `ENSEIGNANT` pour les champs
+  pédagogiques
+- `DELETE /api/students/:id` : réservé à `ADMIN`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Le serveur récupère toujours le rôle depuis l'utilisateur authentifié en base.
+Un rôle envoyé par le navigateur n'est jamais accepté comme autorité et les
+réponses API n'exposent jamais le mot de passe.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Utilisateurs de test
 
-## Deploy on Vercel
+Les nouveaux comptes reçoivent le rôle `ETUDIANT` par défaut. Pour créer les
+comptes nécessaires aux tests du TP :
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npx prisma studio
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Dans la table `User`, définir manuellement un compte `ADMIN` et un compte
+`ENSEIGNANT`. Les valeurs autorisées sont `ADMIN`, `ENSEIGNANT` et `ETUDIANT`.
+
+Les utilisateurs créés avant la migration TP2 peuvent ne pas encore avoir de
+profil dans `Student`. Pour les compléter automatiquement une fois, exécuter
+ce script SQL dans Prisma Studio ou SQLite :
+
+```sql
+INSERT INTO Student (userId, name, email)
+SELECT User.id, User.name, User.email
+FROM User
+LEFT JOIN Student ON Student.userId = User.id
+WHERE Student.id IS NULL;
+```
+
+Dans PowerShell, les requêtes `curl` doivent utiliser `curl.exe`, des
+guillemets doubles autour de l'URL et le backtick `` ` `` pour continuer une
+commande sur plusieurs lignes.
+
+## Tests manuels de sécurité
+
+- Sans session, `GET /api/students` retourne `401`.
+- Un `ETUDIANT` reçoit `403` pour `POST` et `DELETE`.
+- Un `ENSEIGNANT` reçoit `403` pour `POST` et `DELETE`.
+- Un `ADMIN` peut effectuer toutes les opérations CRUD.
+- Une réponse d'authentification ou d'étudiant ne contient jamais `password`.
